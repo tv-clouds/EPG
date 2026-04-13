@@ -28,22 +28,40 @@ jobs:
         run: |
           echo "Setting up PHP environment..."
 
-      - name: 3. 处理 EPG 拆分
+      - name: 3. 处理 EPG 下载与解压
         run: |
           echo "📅 正在启动 EPG 更新任务..."
           mkdir -p list EPG
           
-          # 1. 下载文件 (加上 -f 参数，如果 404 会报错退出)
-          curl -Lfs "https://epg.iill.top/epg.xml.gz" -o list/x.xml.gz
+          # 下载文件到临时位
+          curl -A "Mozilla/5.0" -Lfs "https://epg.iill.top/epg.xml.gz" -o list/source_iill.temp
           
-          # 2. 智能处理：判断是否为 gzip 格式
-          if file list/x.xml.gz | grep -q 'gzip compressed data'; then
-            echo "📦 检测到 gzip 压缩格式，正在解压..."
-            gunzip -fc list/x.xml.gz > list/x.xml
+          # 检查文件类型
+          FILE_TYPE=$(file list/source_iill.temp)
+          echo "🔍 下载文件类型检测: $FILE_TYPE"
+
+          if echo "$FILE_TYPE" | grep -q 'gzip compressed data'; then
+            echo "📦 检测到 gzip 格式，正在解压为 epg_iill.xml..."
+            gunzip -c list/source_iill.temp > list/epg_iill.xml
           else
-            echo "📄 文件不是 gzip 格式，尝试作为纯文本处理..."
-            mv list/x.xml.gz list/x.xml
+            echo "📄 文件为纯文本，重命名为 epg_iill.xml..."
+            mv list/source_iill.temp list/epg_iill.xml
           fi
+
+          # 验证 XML 有效性
+          if grep -q "<?xml" list/epg_iill.xml; then
+            echo "✅ epg_iill.xml 准备就绪"
+            # 如果你现在就要运行 PHP，确保 php 脚本读取的是这个新名字
+            # 或者你可以在这里先用 php epg.php 跑通
+            php epg.php
+          else
+            echo "❌ 错误：内容不是有效的 XML"
+            head -n 5 list/epg_iill.xml
+            exit 1
+          fi
+
+          # 清理临时文件
+          rm -f list/*.temp
           
           # 3. 运行你的处理脚本
           if [ -f "epg.php" ]; then
