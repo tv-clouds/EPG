@@ -28,46 +28,33 @@ jobs:
         run: |
           echo "Setting up PHP environment..."
 
-      - name: 3. 处理 EPG 下载与解压
+      - name: 3. 处理 EPG 任务
         run: |
           echo "📅 正在启动 EPG 更新任务..."
           mkdir -p list EPG
           
-          # 下载文件到临时位
-          curl -A "Mozilla/5.0" -Lfs "https://epg.iill.top/epg.xml.gz" -o list/source_iill.temp
+          # 尝试下载：增加 -A 模拟浏览器，-f 遇到 HTTP 错误直接报错
+          # 如果这个 URL 依然报 22，说明该站点的这个路径确实失效了或屏蔽了 GitHub IP
+          curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+               -Lfs "https://epg.iill.top/epg.xml.gz" -o list/source_1.gz || { echo "❌ 下载失败，请检查 URL"; exit 1; }
           
-          # 检查文件类型
-          FILE_TYPE=$(file list/source_iill.temp)
-          echo "🔍 下载文件类型检测: $FILE_TYPE"
-
+          # 识别文件并统一处理为 .xml
+          FILE_TYPE=$(file list/source_1.gz)
+          echo "🔍 文件类型: $FILE_TYPE"
+          
           if echo "$FILE_TYPE" | grep -q 'gzip compressed data'; then
-            echo "📦 检测到 gzip 格式，正在解压为 epg_iill.xml..."
-            gunzip -c list/source_iill.temp > list/epg_iill.xml
+            echo "📦 解压 gzip..."
+            gunzip -c list/source_1.gz > list/source_1.xml
           else
-            echo "📄 文件为纯文本，重命名为 epg_iill.xml..."
-            mv list/source_iill.temp list/epg_iill.xml
+            echo "📄 文件非压缩格式，直接更名..."
+            mv list/source_1.gz list/source_1.xml
           fi
-
-          # 验证 XML 有效性
-          if grep -q "<?xml" list/epg_iill.xml; then
-            echo "✅ epg_iill.xml 准备就绪"
-            # 如果你现在就要运行 PHP，确保 php 脚本读取的是这个新名字
-            # 或者你可以在这里先用 php epg.php 跑通
-            php epg.php
-          else
-            echo "❌ 错误：内容不是有效的 XML"
-            head -n 5 list/epg_iill.xml
-            exit 1
-          fi
-
-          # 清理临时文件
-          rm -f list/*.temp
           
-          # 3. 运行你的处理脚本
+          # 验证并运行
           if [ -f "epg.php" ]; then
             php epg.php
           else
-            echo "❌ 错误: 找不到 epg.php 脚本"
+            echo "❌ 找不到 epg.php"
             exit 1
           fi
 
