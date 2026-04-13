@@ -28,46 +28,41 @@ jobs:
         run: |
           echo "Setting up PHP environment..."
 
-      - name: 3. 下载并处理 EPG 源
+      - name: 3. 下载并处理多个 EPG 源
         run: |
-          echo "📅 正在启动 EPG 更新任务..."
+          echo "📅 正在启动 Ando EPG 综合处理任务..."
           mkdir -p list EPG
           
-          # 定义下载函数，增加重试机制和伪装
-          download_epg() {
-            local url=$1
-            local output=$2
-            echo "正在尝试下载: $url"
-            # -A: 伪装浏览器, -m: 最长等待15秒, -L: 跟随重定向, -s: 静默模式
-            curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-                 -Lfs --connect-timeout 15 -m 30 "$url" -o "$output"
-            return $?
-          }
+          # 定义源地址列表
+          URLS=(
+            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_cn.xml.gz"
+            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz"
+            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz"
+          )
 
-          # 下载第一个源 (iill.top)
-          if download_epg "https://epg.iill.top/epg.xml.gz" "list/source_1.temp"; then
-            echo "✅ 源 1 下载成功"
-            # 检测并解压
-            if file list/source_1.temp | grep -q 'gzip compressed data'; then
-              gunzip -c list/source_1.temp > list/source_1.xml
+          # 循环下载并解压
+          count=1
+          for url in "${URLS[@]}"; do
+            echo "正在获取源 $count: $url"
+            # 增加 -f 确保 404 时报错退出，增加 -s 静默下载
+            curl -Lfs "$url" -o "list/temp_$count.xml.gz"
+            
+            if [ -f "list/temp_$count.xml.gz" ]; then
+              echo "📦 正在解压源 $count..."
+              gunzip -fc "list/temp_$count.xml.gz" > "list/source_$count.xml"
+              rm -f "list/temp_$count.xml.gz"
             else
-              mv list/source_1.temp list/source_1.xml
+              echo "⚠️ 源 $count 下载失败，跳过。"
             fi
-          else
-            echo "⚠️ 源 1 下载失败，跳过。"
-          fi
-
-          # --- 未来你可以在这里添加源 2, 源 3 ---
-          # if download_epg "https://备用地址/epg.xml" "list/source_2.xml"; then
-          #   echo "✅ 源 2 下载成功"
-          # fi
+            ((count++))
+          done
 
           # 检查 list 目录下是否有任何可用的 XML
           if [ -n "$(ls list/*.xml 2>/dev/null)" ]; then
-            echo "🚀 开始运行 PHP 脚本拼合处理..."
+            echo "🚀 正在通过 PHP 拼合所有数据并生成 JSON..."
             php epg.php
           else
-            echo "❌ 错误：没有任何可用的 XML 文件，任务终止。"
+            echo "❌ 错误：没有任何可用的 XML 文件"
             exit 1
           fi
 
