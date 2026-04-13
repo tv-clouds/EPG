@@ -1,84 +1,46 @@
-name: IPTV EPG Studio
+name: Update EPG Data
 
 on:
   schedule:
-    - cron: '0 2 * * *' # 北京时间每天 10:00 运行 (UTC 02:00)
-  workflow_dispatch: # 支持手动触发
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    - cron: '0 22 * * *' # 每天北京时间早上6点运行
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  epg-task:
+  update-epg:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      TZ: Asia/Shanghai
-
     steps:
-      - name: 1. 检出代码
+      - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          fetch-depth: 0
+          php-version: '8.2'
 
-      - name: 2. 环境初始化 (PHP)
-        # 如果你的 epg.php 不需要特定版本的 PHP，默认环境通常已内置
+      - name: Download and Organize XML
         run: |
-          echo "Setting up PHP environment..."
-
-      - name: 3. 下载并处理多个 EPG 源
-        run: |
-          echo "📅 正在启动 Ando EPG 综合处理任务..."
-          mkdir -p list EPG
+          # 创建存放原始 XML 的目录
+          mkdir -p list/CN list/HK list/TW
           
-          # 定义源地址列表
-          URLS=(
-            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_cn.xml.gz"
-            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz"
-            "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz"
-          )
+          # 下载并解压到对应目录
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_cn.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o hk.gz && gunzip -c hk.gz > list/HK/epg.xml
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o tw.gz && gunzip -c tw.gz > list/TW/epg.xml
 
-          # 循环下载并解压
-          count=1
-          for url in "${URLS[@]}"; do
-            echo "正在获取源 $count: $url"
-            # 增加 -f 确保 404 时报错退出，增加 -s 静默下载
-            curl -Lfs "$url" -o "list/temp_$count.xml.gz"
-            
-            if [ -f "list/temp_$count.xml.gz" ]; then
-              echo "📦 正在解压源 $count..."
-              gunzip -fc "list/temp_$count.xml.gz" > "list/source_$count.xml"
-              rm -f "list/temp_$count.xml.gz"
-            else
-              echo "⚠️ 源 $count 下载失败，跳过。"
-            fi
-            ((count++))
-          done
+      - name: Run EPG Processor
+        run: php epg.php
 
-          # 检查 list 目录下是否有任何可用的 XML
-          if [ -n "$(ls list/*.xml 2>/dev/null)" ]; then
-            echo "🚀 正在通过 PHP 拼合所有数据并生成 JSON..."
-            php epg.php
-          else
-            echo "❌ 错误：没有任何可用的 XML 文件"
-            exit 1
-          fi
-
-      - name: 4. 同步到仓库
+      - name: Deploy to Repository
         run: |
           git config --local user.email "action@github.com"
-          git config --local user.name "Ando-Bot"
-          
-          # 添加相关文件
-          git add list/x.xml* 2>/dev/null || true
-          git add EPG/*.json 2>/dev/null || true
-          
-          if git diff --cached --quiet; then
-            echo "没有检测到 EPG 变动，跳过提交。"
+          git config --local user.name "GitHub Action"
+          git add EPG/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
           else
-            git commit -m "Ando EPG Update: $(date '+%Y-%m-%d %H:%M')"
-            git pull --rebase --autostash origin main
-            git push origin main
+            git commit -m "Update EPG Data $(date +'%Y-%m-%d %H:%M')"
+            git push
           fi
