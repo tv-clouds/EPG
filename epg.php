@@ -1,80 +1,96 @@
 <?php
 /**
- * IPTV EPG 多源拼合处理器
+ * IPTV EPG 分类处理器
+ * 1. 自动扫描 list/ 下的子目录 (CN, HK, TW)
+ * 2. 在对应的 EPG/子目录 下生成中文名的 JSON
  */
 
-$inputDir = __DIR__ . '/list/';
-$outputDir = __DIR__ . '/EPG/';
+$inputBaseDir = __DIR__ . '/list/';
+$outputBaseDir = __DIR__ . '/EPG/';
 
-if (!is_dir($outputDir)) mkdir($outputDir, 0777, true);
 ini_set('memory_limit', '1024M');
 
-// 1. 扫描所有下载好的 XML
-$xmlFiles = glob($inputDir . '*.xml');
-if (empty($xmlFiles)) {
-    die("⚠️ 错误：未发现 XML 文件，请检查下载步骤。\n");
-}
+// 定义需要处理的分类目录
+$categories = ['CN', 'HK', 'TW'];
 
-// 2. 清理旧 JSON 缓存
-echo "正在清理旧数据...\n";
-array_map('unlink', glob($outputDir . '*.json'));
+foreach ($categories as $cat) {
+    $inputDir = $inputBaseDir . $cat . '/';
+    $outputDir = $outputBaseDir . $cat . '/';
 
-$channels = [];
+    echo "📂 正在处理分类: [$cat]\n";
 
-// 3. 解析所有文件并合并数据
-foreach ($xmlFiles as $file) {
-    echo "正在解析: " . basename($file) . "\n";
-    $xml = simplexml_load_file($file, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_COMPACT);
-    if (!$xml) continue;
-
-    foreach ($xml->programme as $prog) {
-        $chId = trim((string)$prog['channel']);
-        if (!$chId) continue;
-
-        $start = (string)$prog['start'];
-        $stop = (string)$prog['stop'];
-        
-        // 提取信息到频道数组
-        $channels[$chId][] = [
-            'start'     => substr($start, 8, 2) . ':' . substr($start, 10, 2),
-            'startTime' => substr($start, 0, 14),
-            'stopTime'  => substr($stop, 0, 14),
-            'program'   => (string)$prog->title
-        ];
-    }
-    unset($xml); // 释放内存
-}
-
-// 4. 去重、排序并输出 JSON
-echo "正在生成 JSON 文件...\n";
-$fileCount = 0;
-
-foreach ($channels as $id => $progList) {
-    // 4a. 按照开始时间排序（重要：解决多源合并后的顺序问题）
-    usort($progList, function($a, $b) {
-        return strcmp($a['startTime'], $b['startTime']);
-    });
-
-    // 4b. 简单去重：防止完全重复的条目
-    $progList = array_map("unserialize", array_unique(array_map("serialize", $progList)));
-    $progList = array_values($progList); // 重置索引
-
-    $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', trim($id));
-    $filePath = $outputDir . $safeName . '.json';
-    
-    if (file_put_contents($filePath, json_encode($progList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))) {
-        $fileCount++;
+    // 检查输入目录是否存在
+    if (!is_dir($inputDir)) {
+        echo "   ⚠️ 跳过：未找到输入目录 $inputDir\n";
+        continue;
     }
 
-    // CCTV5+ 特殊兼容
-    if ($safeName === 'CCTV5+') {
-        file_put_contents($outputDir . 'CCTV5PLUS.json', json_encode($progList, JSON_UNESCAPED_UNICODE));
+    // 确保输出子目录存在
+    if (!is_dir($outputDir)) mkdir($outputDir, 0777, true);
+
+    // 清理该分类下的旧数据
+    array_map('unlink', glob($outputDir . '*.json'));
+
+    // 获取该目录下的所有 XML
+    $xmlFiles = glob($inputDir . '*.xml');
+    if (empty($xmlFiles)) {
+        echo "   ℹ️ 该目录下没有 XML 文件。\n";
+        continue;
     }
+
+    $channels = [];
+    $channelNames = [];
+
+    // 解析 XML
+    foreach ($xmlFiles as $file) {
+        $xml = simplexml_load_file($file, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_COMPACT);
+        if (!$xml) continue;
+
+        // 映射频道名
+        if (isset($xml->channel)) {
+            foreach ($xml->channel as $ch) {
+                $id = trim((string)$ch['id']);
+                $name = trim((string)$ch->{'display-name'});
+                if ($id && $name) $channelNames[$id] = $name;
+            }
+        }
+
+        // 解析节目
+        if (isset($xml->programme)) {
+            foreach ($xml->programme as $prog) {
+                $chId = trim((string)$prog['channel']);
+                $start = (string)$prog['start'];
+                $stop = (string)$prog['stop'];
+                $channels[$chId][] = [
+                    'start'     => substr($start, 8, 2) . ':' . substr($start, 10, 2),
+                    'startTime' => substr($start, 0, 14),
+                    'stopTime'  => substr($stop, 0, 14),
+                    'program'   => (string)$prog->title
+                ];
+            }
+        }
+        unset($xml);
+    }
+
+    // 生成 JSON
+    $fileCount = 0;
+    foreach ($channels as $id => $progList) {
+        $displayName = isset($channelNames[$id]) ? $channelNames[$id] : $id;
+        $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', trim($displayName));
+        if (empty($safeName)) $safeName = $id;
+
+        // 排序与去重
+        usort($progList, function($a, $b) { return strcmp($a['startTime'], $b['startTime']); });
+        $progList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
+
+        $filePath = $outputDir . $safeName . '.json';
+        if (file_put_contents($filePath, json_encode($progList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))) {
+            $fileCount++;
+        }
+    }
+    echo "   ✅ 完成：生成了 $fileCount 个 JSON 文件。\n";
 }
 
-echo "----------------------------------------------------\n";
-echo "✅ 任务完成！\n";
-echo "📊 总频道数: " . count($channels) . "\n";
-echo "💾 已生成 JSON: $fileCount 个\n";
-echo "📅 时间: " . date('Y-m-d H:i:s') . "\n";
+echo "\n----------------------------------------------------\n";
+echo "🚀 所有任务执行完毕！时间: " . date('Y-m-d H:i:s') . "\n";
 echo "----------------------------------------------------\n";
