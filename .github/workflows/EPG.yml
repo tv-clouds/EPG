@@ -35,12 +35,19 @@ jobs:
 
       - name: Deploy to Repository
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 这一步可以确保拉取最新的提交，防止冲突
+          git pull origin main --rebase
+          
           git add EPG/
+          
+          # 检查是否有文件变化
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "没有发现数据变更，跳过提交。"
           else
-            git commit -m "Update EPG Data $(date +'%Y-%m-%d %H:%M')"
-            git push
+            git commit -m "Auto Update EPG: $(date +'%Y-%m-%d %H:%M:%S')"
+            # 使用默认令牌推送
+            git push origin main
           fi
