@@ -2,11 +2,16 @@ name: Update EPG Data
 
 on:
   schedule:
-    - cron: '0 22 * * *' # 每天北京时间早上6点运行
-  workflow_dispatch:
+    # 每天北京时间早上 6:00 运行 (UTC 22:00)
+    - cron: '0 22 * * *'
+  workflow_dispatch: # 允许手动运行
   push:
     branches:
       - main
+
+# 显式声明权限，防止 403 错误
+permissions:
+  contents: write
 
 jobs:
   update-epg:
@@ -22,10 +27,8 @@ jobs:
 
       - name: Download and Organize XML
         run: |
-          # 创建存放原始 XML 的目录
           mkdir -p list/CN list/HK list/TW
-          
-          # 下载并解压到对应目录
+          # 下载并解压
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_cn.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o hk.gz && gunzip -c hk.gz > list/HK/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o tw.gz && gunzip -c tw.gz > list/TW/epg.xml
@@ -38,16 +41,14 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 这一步可以确保拉取最新的提交，防止冲突
           git pull origin main --rebase
           
-          git add EPG/
+          # 直接添加根目录下的分类文件夹
+          git add CN/ HK/ TW/
           
-          # 检查是否有文件变化
           if git diff --staged --quiet; then
-            echo "没有发现数据变更，跳过提交。"
+            echo "No changes to commit"
           else
-            git commit -m "Auto Update EPG: $(date +'%Y-%m-%d %H:%M:%S')"
-            # 使用默认令牌推送
+            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           fi
