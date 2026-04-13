@@ -28,33 +28,46 @@ jobs:
         run: |
           echo "Setting up PHP environment..."
 
-      - name: 3. 处理 EPG 任务
+      - name: 3. 下载并处理 EPG 源
         run: |
           echo "📅 正在启动 EPG 更新任务..."
           mkdir -p list EPG
           
-          # 尝试下载：增加 -A 模拟浏览器，-f 遇到 HTTP 错误直接报错
-          # 如果这个 URL 依然报 22，说明该站点的这个路径确实失效了或屏蔽了 GitHub IP
-          curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-               -Lfs "https://epg.iill.top/epg.xml.gz" -o list/source_1.gz || { echo "❌ 下载失败，请检查 URL"; exit 1; }
-          
-          # 识别文件并统一处理为 .xml
-          FILE_TYPE=$(file list/source_1.gz)
-          echo "🔍 文件类型: $FILE_TYPE"
-          
-          if echo "$FILE_TYPE" | grep -q 'gzip compressed data'; then
-            echo "📦 解压 gzip..."
-            gunzip -c list/source_1.gz > list/source_1.xml
+          # 定义下载函数，增加重试机制和伪装
+          download_epg() {
+            local url=$1
+            local output=$2
+            echo "正在尝试下载: $url"
+            # -A: 伪装浏览器, -m: 最长等待15秒, -L: 跟随重定向, -s: 静默模式
+            curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                 -Lfs --connect-timeout 15 -m 30 "$url" -o "$output"
+            return $?
+          }
+
+          # 下载第一个源 (iill.top)
+          if download_epg "https://epg.iill.top/epg.xml.gz" "list/source_1.temp"; then
+            echo "✅ 源 1 下载成功"
+            # 检测并解压
+            if file list/source_1.temp | grep -q 'gzip compressed data'; then
+              gunzip -c list/source_1.temp > list/source_1.xml
+            else
+              mv list/source_1.temp list/source_1.xml
+            fi
           else
-            echo "📄 文件非压缩格式，直接更名..."
-            mv list/source_1.gz list/source_1.xml
+            echo "⚠️ 源 1 下载失败，跳过。"
           fi
-          
-          # 验证并运行
-          if [ -f "epg.php" ]; then
+
+          # --- 未来你可以在这里添加源 2, 源 3 ---
+          # if download_epg "https://备用地址/epg.xml" "list/source_2.xml"; then
+          #   echo "✅ 源 2 下载成功"
+          # fi
+
+          # 检查 list 目录下是否有任何可用的 XML
+          if [ -n "$(ls list/*.xml 2>/dev/null)" ]; then
+            echo "🚀 开始运行 PHP 脚本拼合处理..."
             php epg.php
           else
-            echo "❌ 找不到 epg.php"
+            echo "❌ 错误：没有任何可用的 XML 文件，任务终止。"
             exit 1
           fi
 
