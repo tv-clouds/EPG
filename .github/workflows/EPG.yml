@@ -1,4 +1,4 @@
-name: IPTV Studio EPG
+name: IPTV EPG Studio
 
 on:
   schedule:
@@ -33,13 +33,19 @@ jobs:
           echo "📅 正在启动 EPG 更新任务..."
           mkdir -p list EPG
           
-          # 下载新的 EPG 文件
-          curl -L "https://epg.iill.top/epg.xml.gz" -o list/x.xml.gz
+          # 1. 下载文件 (加上 -f 参数，如果 404 会报错退出)
+          curl -Lfs "https://epg.iill.top/epg.xml.gz" -o list/x.xml.gz
           
-          # 解压文件 (-f 强制覆盖, -k 保留原压缩包)
-          gunzip -fk list/x.xml.gz
+          # 2. 智能处理：判断是否为 gzip 格式
+          if file list/x.xml.gz | grep -q 'gzip compressed data'; then
+            echo "📦 检测到 gzip 压缩格式，正在解压..."
+            gunzip -fc list/x.xml.gz > list/x.xml
+          else
+            echo "📄 文件不是 gzip 格式，尝试作为纯文本处理..."
+            mv list/x.xml.gz list/x.xml
+          fi
           
-          # 运行你的处理脚本
+          # 3. 运行你的处理脚本
           if [ -f "epg.php" ]; then
             php epg.php
           else
