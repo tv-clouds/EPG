@@ -1,6 +1,6 @@
 <?php
 /**
- * Ando EPG 分类处理器 - 自动分箱版（带特殊频道别名）
+ * Ando EPG 分类处理器 - 自动分箱与频道别名优化版
  */
 
 // 路径配置
@@ -67,11 +67,18 @@ foreach ($categories as $cat) {
         if (empty($displayName)) continue;
 
         // --- 核心逻辑：定义需要生成的名称列表 ---
-        $namesToGenerate = [trim($displayName)];
+        $originalName = trim($displayName);
+        $namesToGenerate = [$originalName];
         
-        // 如果是 CCTV5+，则添加别名 CCTV5 Plus
-        if (trim($displayName) === 'CCTV5+') {
-            $namesToGenerate[] = 'CCTV5 Plus';
+        /**
+         * 别名逻辑：
+         * 1. 如果匹配 "CCTV5+" (不区分大小写)，生成 "CCTV5plus"
+         * 2. 如果匹配 "cctv5+" (不区分大小写)，生成 "cctv5plus"
+         * 这里根据原始名称的大小写动态决定别名的形式
+         */
+        if (strcasecmp($originalName, 'CCTV5+') === 0) {
+            // 将 "+" 替换为 "plus"，保持原有的大小写风格
+            $namesToGenerate[] = str_replace('+', 'plus', $originalName);
         }
         // ---------------------------------------
 
@@ -81,6 +88,7 @@ foreach ($categories as $cat) {
             $targetDir = $outputBaseDir . $folderIndex . '/';
             if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
 
+            // 过滤非法字符
             $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $nameItem);
             
             // 排序与去重
