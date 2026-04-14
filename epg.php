@@ -1,11 +1,11 @@
 <?php
 /**
- * Ando EPG 分类处理器 - 自动分箱版
+ * Ando EPG 分类处理器 - 自动分箱版（带特殊频道别名）
  */
 
 // 路径配置
 $inputBaseDir  = __DIR__ . '/list/';
-$outputBaseDir = __DIR__ . '/EPG/'; // 修改：所有输出都在 EPG 目录下
+$outputBaseDir = __DIR__ . '/EPG/'; 
 
 ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
@@ -14,7 +14,6 @@ $categories = ['CN', 'HK', 'TW'];
 
 // 1. 初始化：清理并重新创建 EPG 目录
 if (is_dir($outputBaseDir)) {
-    // 递归清理旧数据
     exec("rm -rf " . escapeshellarg($outputBaseDir));
 }
 mkdir($outputBaseDir, 0777, true);
@@ -67,22 +66,33 @@ foreach ($categories as $cat) {
         $displayName = $channelNames[$id] ?? $id;
         if (empty($displayName)) continue;
 
-        // 计算当前应该存放的子目录 (01, 02, 03...)
-        $folderIndex = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
-        $targetDir = $outputBaseDir . $folderIndex . '/';
+        // --- 核心逻辑：定义需要生成的名称列表 ---
+        $namesToGenerate = [trim($displayName)];
         
-        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+        // 如果是 CCTV5+，则添加别名 CCTV5 Plus
+        if (trim($displayName) === 'CCTV5+') {
+            $namesToGenerate[] = 'CCTV5 Plus';
+        }
+        // ---------------------------------------
 
-        $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', trim($displayName));
-        
-        usort($progList, function($a, $b) { 
-            return strcmp($a['startTime'], $b['startTime']); 
-        });
-        $progList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
+        foreach ($namesToGenerate as $nameItem) {
+            // 计算分箱目录
+            $folderIndex = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
+            $targetDir = $outputBaseDir . $folderIndex . '/';
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
 
-        $filePath = $targetDir . $safeName . '.json';
-        if (file_put_contents($filePath, json_encode($progList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))) {
-            $globalFileCount++;
+            $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $nameItem);
+            
+            // 排序与去重
+            usort($progList, function($a, $b) { 
+                return strcmp($a['startTime'], $b['startTime']); 
+            });
+            $finalProgList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
+
+            $filePath = $targetDir . $safeName . '.json';
+            if (file_put_contents($filePath, json_encode($finalProgList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))) {
+                $globalFileCount++;
+            }
         }
     }
     echo "    ✅ 分类 [$cat] 处理完毕。\n";
