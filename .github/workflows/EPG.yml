@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # 取消浅克隆，确保 rebase 有足够的历史记录
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -27,8 +30,9 @@ jobs:
 
       - name: Download and Organize XML
         run: |
+          # 创建临时工作目录
           mkdir -p list/CN list/HK list/TW
-          # 下载并解压
+          # 下载并解压到 list 目录
           curl -Lfs "https://github.com/zzq1234567890/epg/raw/refs/heads/main/swepg.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o hk.gz && gunzip -c hk.gz > list/HK/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o tw.gz && gunzip -c tw.gz > list/TW/epg.xml
@@ -38,14 +42,24 @@ jobs:
 
       - name: Deploy to Repository
         run: |
+          # 1. 配置身份信息
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
-          git pull origin main --rebase
-          
-          # 直接添加根目录下的分类文件夹
+
+          # 2. 确保 list 目录被忽略（防止提交巨大的原始 XML 文件）
+          # 如果你的仓库里没有 .gitignore，这行会很有帮助
+          if [ ! -f .gitignore ] || ! grep -q "list/" .gitignore; then
+            echo "list/" >> .gitignore
+          fi
+
+          # 3. 添加生成后的结果文件（根据你的描述是根目录下的 CN/ HK/ TW/）
           git add CN/ HK/ TW/
-          
+
+          # 4. 核心：使用 autostash 处理 pull rebase
+          # 这会暂存你刚刚生成的更改，拉取远程更新后再合并回来
+          git pull origin main --rebase --autostash
+
+          # 5. 检查是否有变化并提交
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
