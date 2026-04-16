@@ -98,6 +98,14 @@ foreach ($channels as $id => $progList) {
     $displayName = $channelNames[$id] ?? $id;
     if (empty($displayName)) continue;
 
+    // --- 写入 JSON 逻辑 ---
+echo "⚙️ 正在执行分箱逻辑并写入子目录...\n";
+
+foreach ($channels as $id => $progList) {
+    // 优先使用 display-name，没有则用 ID
+    $displayName = $channelNames[$id] ?? $id;
+    if (empty($displayName)) continue;
+
     // 排序与去重
     usort($progList, function($a, $b) {
         return strcmp($a['startTime'], $b['startTime']);
@@ -105,20 +113,29 @@ foreach ($channels as $id => $progList) {
     $finalProgList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
     $jsonEncoded = json_encode($finalProgList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    // 原始名称
-    $targetName = trim($displayName);
-    
-    // 计算文件夹索引 (01, 02...)
-    $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
-    $targetDir = $baseDir . $folderIdx . '/';
+    // --- 关键修改：处理名称别名 ---
+    $nameItem = trim($displayName);
+    $targets = [$nameItem]; // 默认包含原始名称
 
-    if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+    // 如果名称中包含 +，则增加一个 Plus 的版本
+    if (strpos($nameItem, '+') !== false) {
+        $targets[] = str_replace('+', 'Plus', $nameItem);
+    }
 
-    // 过滤掉系统文件名非法字符，但保持文字原始内容
-    $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
-    
-    if (file_put_contents($targetDir . $safeFileName . '.json', $jsonEncoded)) {
-        $globalFileCount++;
+    // 遍历所有目标名称（原始名和 Plus 名都会生成文件）
+    foreach ($targets as $targetName) {
+        // 计算文件夹索引 (01, 02...)
+        $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
+        $targetDir = $baseDir . $folderIdx . '/';
+
+        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+
+        // 过滤掉系统文件名非法字符
+        $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
+        
+        if (file_put_contents($targetDir . $safeFileName . '.json', $jsonEncoded)) {
+            $globalFileCount++;
+        }
     }
 }
 
