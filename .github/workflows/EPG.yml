@@ -25,12 +25,20 @@ jobs:
         with:
           php-version: '8.2'
 
-      - name: Download and Organize XML
+      - name: Preparation and Download
         run: |
-          mkdir -p list/CN list/HK list/TW
-          curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
-          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o hk.gz && gunzip -c hk.gz > list/HK/epg.xml
-          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o tw.gz && gunzip -c tw.gz > list/TW/epg.xml
+          # 1. 在 EPG 目录下创建 01-10 子目录
+          mkdir -p EPG/{01..10}
+          
+          # 2. 下载所有压缩包直接到 EPG 目录内
+          curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/cn.gz
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.gz
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.gz
+          curl -Lfs "https://epg.cdn.loc.cc/xml/all.xml.gz" -o EPG/all.gz
+          
+          # 3. 在 EPG 目录内解压，生成 cn.xml, hk.xml, tw.xml, all.xml
+          # gunzip -f 会自动移除原有的 .gz 文件并保留解压后的 .xml
+          gunzip -f EPG/cn.gz EPG/hk.gz EPG/tw.gz EPG/all.gz
 
       - name: Run EPG Processor
         run: php epg.php
@@ -40,11 +48,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          if [ ! -f .gitignore ] || ! grep -q "list/" .gitignore; then
-            echo "list/" >> .gitignore
-          fi
-
-          # 修改这里：只添加 EPG 目录
+          # 仅添加 EPG 目录（包含 xml 和生成的 json 子目录）
           git add EPG/
           
           git pull origin main --rebase --autostash
