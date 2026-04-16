@@ -28,7 +28,7 @@ jobs:
       - name: Download and Organize XML
         run: |
           mkdir -p list/CN list/HK list/TW
-          curl -Lfs "https://raw.githubusercontent.com/Meroser/EPG-test/refs/heads/main/tvxml-Meroser.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
+          curl -Lfs "https://raw.githubusercontent.com/sparkssssssssss/epg/main/pp.xml.gz" -o cn.gz && gunzip -c cn.gz > list/CN/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o hk.gz && gunzip -c hk.gz > list/HK/epg.xml
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o tw.gz && gunzip -c tw.gz > list/TW/epg.xml
 
