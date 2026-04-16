@@ -67,18 +67,21 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          # 1. 先把所有新生成的 JSON 文件夹加进去
+          # 1. 把新生成的 JSON 文件夹加进去
           git add EPG/
           
           # 2. 强制删掉不需要提交的原始大文件（XML/GZ）
-          # 这样仓库里就只有干净的 01/ 02/ 目录
           find EPG -maxdepth 1 -name "*.xml" -delete
           find EPG -maxdepth 1 -name "*.gz" -delete
           
-          # 3. 提交变更
+          # 3. 提交变更并处理远程冲突
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
             git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            
+            # 关键修正：在 push 之前先拉取远程更新并变基，避免版本冲突
+            git pull --rebase origin main
+            
             git push origin main
           fi
