@@ -9,7 +9,7 @@ ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
 
 // 工作流中下载的 4 个文件名
-$xmlFilesToProcess = ['cn.xml', 'hk.xml', 'tw.xml', 'all.xml'];
+$xmlFilesToProcess = ['cn.xml', 'hk.xml', 'tw.xml', 'pl.xml'];
 
 $globalFileCount = 0;
 $filesPerFolder = 900;
