@@ -27,27 +27,27 @@ jobs:
 
       - name: Preparation and Download
         run: |
-          # 1. 彻底清理旧的 JSON 和 XML，防止脏数据干扰
-          # 注意：保留 EPG 根目录，但清空子目录
-          find EPG -mindepth 1 -maxdepth 2 -not -name ".gitkeep" -delete 2>/dev/null || true
+          # 1. 彻底清理并创建目录
+          rm -rf EPG/
           mkdir -p EPG
 
-          # 2. 下载文件 (增加重试机制)
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande03/epg/refs/heads/master/pl.xml.gz" -o EPG/pl.xml.gz
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
+          # 2. 下载
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande031/epg/master/pl.xml.gz" -o EPG/pl.xml.gz
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
           
-          # 3. 智能解压并重命名为 PHP 识别的文件名
+          # 3. 修正后的解压逻辑：强制清理后缀并重命名
           for f in EPG/*.gz; do
-            if gzip -t "$f" 2>/dev/null; then
-              echo "Decompressing $f..."
-              gunzip -c "$f" > "EPG/$(basename "${f%.gz}" | sed 's/epgpw_//')".xml
-            else
-              echo "Warning: $f is not a valid gzip, trying direct rename..."
-              mv "$f" "EPG/$(basename "${f%.gz}" | sed 's/epgpw_//')".xml
+            if [ -f "$f" ]; then
+              # 提取文件名，去掉 epgpw_ 前缀，去掉所有 .xml 或 .gz 相关的后缀，最后统一补上 .xml
+              BASE=$(basename "$f" | sed 's/epgpw_//g' | sed 's/\.xml//g' | sed 's/\.gz//g')
+              echo "处理中: $f -> EPG/$BASE.xml"
+              gunzip -c "$f" > "EPG/$BASE.xml"
             fi
           done
-
+          
+          # 验证结果
+          ls -F EPG/
       - name: Run EPG Processor
         run: |
           # 确保 EPG 目录干净且存在
