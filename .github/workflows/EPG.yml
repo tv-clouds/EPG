@@ -27,7 +27,7 @@ jobs:
 
       - name: Preparation and Download
         run: |
-          # 1. 运行的第一步：清理旧的 XML 和压缩包
+          # 1. 第一步：清理旧的 XML 和压缩包
           rm -f EPG/*.xml
           rm -f EPG/*.xml.gz
           rm -f EPG/*.gz
@@ -35,14 +35,27 @@ jobs:
           # 2. 确保输出目录结构存在
           mkdir -p EPG/{01..10}
           
-          # 3. 下载最新的压缩包
+          # 3. 下载最新的文件
           curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/cn.xml.gz
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
           curl -Lfs "https://epg.cdn.loc.cc/xml/all.xml.gz" -o EPG/all.xml.gz
           
-          # 4. 解压 XML（使用 -k 参数保留原始 .gz 文件）
-          gunzip -fk EPG/cn.xml.gz EPG/hk.xml.gz EPG/tw.xml.gz EPG/all.xml.gz
+          # 4. 智能解压逻辑
+          # 遍历所有下载的文件，判断是否为 gzip 格式，如果是则解压并改名
+          for f in EPG/*.xml.gz; do
+            if file "$f" | grep -q 'gzip compressed'; then
+              echo "Extracting $f..."
+              # 解压并输出为去掉 .gz 后缀的文件名
+              gunzip -fk "$f"
+            else
+              echo "$f is not a gzip file, renaming to .xml"
+              # 如果不是压缩包，直接去掉 .gz 后缀变成 .xml 供 PHP 读取
+              mv "$f" "${f%.gz}"
+              # 顺便把原本不是压缩包的文件伪装成 .xml.gz 存着（满足你保留的需求）
+              cp "${f%.gz}" "$f"
+            fi
+          done
 
       - name: Run EPG Processor
         run: php epg.php
@@ -52,14 +65,12 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          # 添加整个 EPG 目录（包含 XML, GZ 和最新的 JSON 子目录）
           git add EPG/
-          
           git pull origin main --rebase --autostash
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') (Full Update)"
+            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') (Fix decompression)"
             git push origin main
           fi
