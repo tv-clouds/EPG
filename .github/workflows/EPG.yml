@@ -27,8 +27,9 @@ jobs:
 
       - name: Preparation and Download
         run: |
-          - name: Preparation and Download
-        run: |
+          # 安装 file 工具确保检测逻辑正常
+          sudo apt-get update && sudo apt-get install -y file
+
           # 1. 清理旧文件
           rm -f EPG/*.xml
           rm -f EPG/*.xml.gz
@@ -37,7 +38,7 @@ jobs:
           # 2. 确保目录结构
           mkdir -p EPG/{01..10}
           
-          # 3. 下载文件（增加了最后一个 PL 源）
+          # 3. 下载文件
           curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/cn.xml.gz
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
           curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
@@ -47,8 +48,10 @@ jobs:
           # 4. 智能解压逻辑
           for f in EPG/*.xml.gz; do
             if file "$f" | grep -q 'gzip compressed'; then
+              echo "Unzipping $f..."
               gunzip -fk "$f"
             else
+              echo "$f is not a gzip, renaming..."
               mv "$f" "${f%.gz}"
               cp "${f%.gz}" "$f"
             fi
@@ -68,6 +71,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') (Fix decompression)"
+            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M')"
             git push origin main
           fi
