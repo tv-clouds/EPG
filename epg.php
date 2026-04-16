@@ -20,7 +20,7 @@ ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
 
 // 目标文件列表
-$xmlFilesToProcess = ['epg.xml', 'hk.xml', 'tw.xml'];
+$xmlFilesToProcess = ['t.xml', 'hk.xml', 'tw.xml'];
 $globalFileCount = 0;
 $filesPerFolder = 900; 
 
