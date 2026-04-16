@@ -27,18 +27,22 @@ jobs:
 
       - name: Preparation and Download
         run: |
-          # 1. 在 EPG 目录下创建 01-10 子目录
+          # 1. 运行的第一步：清理旧的 XML 和压缩包
+          rm -f EPG/*.xml
+          rm -f EPG/*.xml.gz
+          rm -f EPG/*.gz
+
+          # 2. 确保输出目录结构存在
           mkdir -p EPG/{01..10}
           
-          # 2. 下载所有压缩包直接到 EPG 目录内
-          curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/cn.gz
-          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.gz
-          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.gz
-          curl -Lfs "https://epg.cdn.loc.cc/xml/all.xml.gz" -o EPG/all.gz
+          # 3. 下载最新的压缩包
+          curl -Lfs "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/cn.xml.gz
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
+          curl -Lfs "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
+          curl -Lfs "https://epg.cdn.loc.cc/xml/all.xml.gz" -o EPG/all.xml.gz
           
-          # 3. 在 EPG 目录内解压，生成 cn.xml, hk.xml, tw.xml, all.xml
-          # gunzip -f 会自动移除原有的 .gz 文件并保留解压后的 .xml
-          gunzip -f EPG/cn.gz EPG/hk.gz EPG/tw.gz EPG/all.gz
+          # 4. 解压 XML（使用 -k 参数保留原始 .gz 文件）
+          gunzip -fk EPG/cn.xml.gz EPG/hk.xml.gz EPG/tw.xml.gz EPG/all.xml.gz
 
       - name: Run EPG Processor
         run: php epg.php
@@ -48,7 +52,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          # 仅添加 EPG 目录（包含 xml 和生成的 json 子目录）
+          # 添加整个 EPG 目录（包含 XML, GZ 和最新的 JSON 子目录）
           git add EPG/
           
           git pull origin main --rebase --autostash
@@ -56,6 +60,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') (Packaged)"
+            git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') (Full Update)"
             git push origin main
           fi
