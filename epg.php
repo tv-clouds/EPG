@@ -1,17 +1,18 @@
 <?php
 /**
  * Ando EPG 分类处理器
+ * 功能：解析 XML/JSON EPG 数据，按原始名称分箱存储为 JSON
  */
 
 $baseDir = __DIR__ . '/EPG/'; 
 ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
 
-// --- 关键修改：增加 pl.xml ---
-$xmlFilesToProcess = ['hk.xml', 'tw.xml', 'all.xml'];
+// 待处理的文件列表
+$xmlFilesToProcess = ['pl.xml', 'hk.xml', 'tw.xml'];
 
 $globalFileCount = 0;
-$filesPerFolder = 900;
+$filesPerFolder = 900; // 每文件夹存放 900 个文件
 
 echo "🚀 EPG 处理器启动...\n";
 
@@ -20,7 +21,10 @@ $channelNames = [];
 
 foreach ($xmlFilesToProcess as $fileName) {
     $filePath = $baseDir . $fileName;
-    if (!file_exists($filePath)) continue;
+    if (!file_exists($filePath)) {
+        echo "⚠️ 跳过不存在的文件：$fileName\n";
+        continue;
+    }
 
     echo "📖 正在解析：$fileName\n";
     $content = file_get_contents($filePath);
@@ -28,20 +32,18 @@ foreach ($xmlFilesToProcess as $fileName) {
 
     $firstChar = substr(trim($content), 0, 1);
 
-    // --- 逻辑 A: 处理 JSON 格式 (针对 loc.cc 等源) ---
+    // --- 逻辑 A: 处理 JSON 格式 ---
     if ($firstChar === '{' || $firstChar === '[') {
-        echo "💡 检测到 JSON 数据流，执行动态转换...\n";
+        echo "💡 检测到 JSON 数据流...\n";
         $data = json_decode($content, true);
-        
         if ($data) {
-            // loc.cc 的结构通常在 epg_data 键下，或者直接是数组
             $items = $data['epg_data'] ?? (is_array($data) ? $data : []);
             $chId = $data['channel_id'] ?? $fileName;
+            // 直接读取原始名称，不做转换
             $chName = $data['channel_name'] ?? $chId;
             $channelNames[$chId] = $chName;
 
             foreach ($items as $item) {
-                // 统一时间格式为 YmdHis 供后续排序
                 $rawStart = $item['start_time'] ?? ($item['start'] ?? '');
                 $rawEnd = $item['end_time'] ?? ($item['end'] ?? '');
                 
@@ -65,6 +67,7 @@ foreach ($xmlFilesToProcess as $fileName) {
         if (isset($xml->channel)) {
             foreach ($xml->channel as $ch) {
                 $id = trim((string)$ch['id']);
+                // 保持原始简繁体和大小写
                 $name = trim((string)$ch->{'display-name'});
                 if ($id && $name) $channelNames[$id] = $name;
             }
@@ -87,40 +90,39 @@ foreach ($xmlFilesToProcess as $fileName) {
     unset($content, $xml, $data);
 }
 
-// --- 3. 统一分箱写入 JSON ---
-echo "⚙️ 正在执行分箱逻辑并写入 EPG/01-10 子目录...\n";
+// --- 写入 JSON 逻辑 ---
+echo "⚙️ 正在执行分箱逻辑并写入子目录...\n";
 
 foreach ($channels as $id => $progList) {
+    // 优先使用 display-name，没有则用 ID
     $displayName = $channelNames[$id] ?? $id;
     if (empty($displayName)) continue;
 
-    // 预处理：排序与去重
+    // 排序与去重
     usort($progList, function($a, $b) {
         return strcmp($a['startTime'], $b['startTime']);
     });
     $finalProgList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
     $jsonEncoded = json_encode($finalProgList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    // 别名列表
-    $nameItem = trim($displayName);
-    $aliases = [$nameItem];
-    if (strcasecmp($nameItem, 'CCTV5+') === 0) {
-        $aliases[] = str_replace('+', 'Plus', $nameItem);
-    }
+    // 原始名称
+    $targetName = trim($displayName);
+    
+    // 计算文件夹索引 (01, 02...)
+    $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
+    $targetDir = $baseDir . $folderIdx . '/';
 
-    foreach ($aliases as $targetName) {
-        $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
-        $targetDir = $baseDir . $folderIdx . '/';
+    if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
 
-        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
-
-        $safeName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
-        if (file_put_contents($targetDir . $safeName . '.json', $jsonEncoded)) {
-            $globalFileCount++;
-        }
+    // 过滤掉系统文件名非法字符，但保持文字原始内容
+    $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
+    
+    if (file_put_contents($targetDir . $safeFileName . '.json', $jsonEncoded)) {
+        $globalFileCount++;
     }
 }
 
 echo "\n✨ 任务圆满完成！";
 echo "\n📊 总计生成文件: $globalFileCount 个";
-echo "\n📂 存储路径: EPG/01-" . str_pad(ceil($globalFileCount / $filesPerFolder), 2, '0', STR_PAD_LEFT) . "\n";
+$lastFolder = str_pad(ceil($globalFileCount / $filesPerFolder), 2, '0', STR_PAD_LEFT);
+echo "\n📂 存储路径: EPG/01 到 EPG/$lastFolder\n";
