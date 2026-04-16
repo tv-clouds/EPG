@@ -32,7 +32,8 @@ jobs:
           mkdir -p EPG
           
           # 下载 GZ 压缩格式的源
-          curl -Lfs --retry 3 "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/t.xml.gz || echo "t 下载失败"
+          curl -Lfs --retry 3 "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/t.xml.gz || echo "T 下载失败"
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande03/epg/refs/heads/master/pl.xml.gz" -o EPG/pl.xml.gz || echo "PL 下载失败"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz || echo "HK 下载失败"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz || echo "TW 下载失败"
           
