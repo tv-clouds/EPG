@@ -20,7 +20,7 @@ ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
 
 // 目标文件列表
-$xmlFilesToProcess = ['t.xml', 'e9.xml', 'hk.xml', 'tw.xml'];
+$xmlFilesToProcess = ['t.xml', 'pl.xml', 'hk.xml', 'tw.xml'];
 $globalFileCount = 0;
 $filesPerFolder = 900; 
 
@@ -30,45 +30,61 @@ echo "📂 强制扫描目录: $baseDir\n";
 $channels = [];
 $channelNames = [];
 
-// --- 2. 解析逻辑 (保持之前的命名空间修复) ---
+// --- 2. 解析逻辑 (增加优先级过滤) ---
+$lockedChannelIds = []; // 用于记录哪些 Channel ID 已经被高优先级的 XML 占用了
+
 foreach ($xmlFilesToProcess as $fileName) {
     $filePath = $baseDir . $fileName;
     
     if (!file_exists($filePath)) {
-        // 尝试在上一级目录找一下（防御性逻辑）
-        $altPath = dirname($baseDir) . '/' . $fileName;
-        if (file_exists($altPath)) {
-            $filePath = $altPath;
-        } else {
-            echo "⚠️ 找不到文件: $filePath\n";
-            continue;
-        }
+        echo "⚠️ 找不到文件: $filePath\n";
+        continue;
     }
 
-    echo "📖 正在解析：$filePath\n";
+    echo "📖 正在解析 ($fileName)：$filePath\n";
     $content = file_get_contents($filePath);
     if (empty($content)) continue;
 
-    // 移除 XML 命名空间，防止 SimpleXML 解析失败
+    // 移除命名空间
     $content = preg_replace('/<(tv|xmltv)[^>]*xmlns[:="][^>]*>/i', '<$1>', $content);
-    
     $xml = @simplexml_load_string($content, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_COMPACT);
     if (!$xml) {
         echo "❌ 无法解析 XML 内容: $fileName\n";
         continue;
     }
 
+    // 临时存放当前 XML 里的频道映射
+    $currentFileChannels = [];
+
+    // 1. 先提取当前文件所有的 Channel ID 和 Name
     if (isset($xml->channel)) {
         foreach ($xml->channel as $ch) {
             $id = trim((string)$ch['id']);
             $name = trim((string)$ch->{"display-name"});
-            if ($id && $name) $channelNames[$id] = $name;
+            if (!$id || !$name) continue;
+
+            // 关键：如果这个频道名称在之前的 XML 里已经处理过了，跳过此频道
+            if (isset($lockedChannelIds[$name])) {
+                continue; 
+            }
+
+            $channelNames[$id] = $name;
+            $currentFileChannels[$id] = $name;
+            // 标记这个频道名已被占用（基于当前 XML 文件的优先级）
+            $lockedChannelIds[$name] = true;
         }
     }
 
+    // 2. 提取节目单，只提取属于“未被占用”频道的节目
     if (isset($xml->programme)) {
         foreach ($xml->programme as $prog) {
             $chId = trim((string)$prog['channel']);
+            
+            // 关键：只处理属于当前文件合法（未被更高优先级覆盖）的频道
+            if (!isset($currentFileChannels[$chId])) {
+                continue;
+            }
+
             $start = (string)$prog['start'];
             $stop = (string)$prog['stop'];
             if ($chId && $start) {
@@ -81,7 +97,7 @@ foreach ($xmlFilesToProcess as $fileName) {
             }
         }
     }
-    unset($content, $xml);
+    unset($content, $xml, $currentFileChannels);
 }
 
 // --- 3. 写入逻辑 (保持不变) ---
