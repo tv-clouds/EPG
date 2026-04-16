@@ -33,7 +33,7 @@ jobs:
           mkdir -p EPG
 
           # 2. 下载文件 (增加重试机制)
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande031/epg/refs/heads/master/pl.xml.gz" -o EPG/pl.xml.gz
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande03/epg/refs/heads/master/pl.xml.gz" -o EPG/pl.xml.gz
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/refs/heads/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz
           
