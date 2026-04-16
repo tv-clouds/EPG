@@ -3,16 +3,23 @@
  * IPTV EPG 分类处理器
  */
 
-// 强制定位到脚本所在目录下的 EPG 文件夹
-$baseDir = dirname(__FILE__) . '/EPG/'; 
+// --- 动态路径修正 ---
+// 如果当前目录名已经是 EPG，就直接用当前目录；否则用当前目录下的 EPG/
+$currentDir = str_replace('\\', '/', dirname(__FILE__));
+if (substr($currentDir, -4) === '/EPG') {
+    $baseDir = $currentDir . '/';
+} else {
+    $baseDir = $currentDir . '/EPG/';
+}
+
 ini_set('memory_limit', '1024M');
 date_default_timezone_set('Asia/Shanghai');
 
-// 确保 EPG 根目录存在
 if (!is_dir($baseDir)) {
     mkdir($baseDir, 0777, true);
 }
 
+// 对应上面 YAML 生成的文件名
 $xmlFilesToProcess = ['pl.xml', 'hk.xml', 'tw.xml'];
 $globalFileCount = 0;
 $filesPerFolder = 900; 
