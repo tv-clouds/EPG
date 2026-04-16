@@ -58,16 +58,24 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          # 这里的关键是先 add 再判断，防止文件太多导致 status 极慢
-          git add EPG/*.json
-          
-          # 排除掉下载的原始 XML 文件，只提交处理后的 JSON
-          git rm -f EPG/*.xml 2>/dev/null || true
+          # 1. 检查 EPG 目录下到底有没有生成 json 文件（用于调试）
+          echo "检查生成的 JSON 文件列表："
+          find EPG -name "*.json" | head -n 5
 
+          # 2. 尝试添加所有变更
+          # 使用 git add -A 会自动处理新增、修改和删除，且不会因为找不到匹配而报错
+          git add -A EPG/
+
+          # 3. 排除下载的原始 XML 文件，我们不希望把大文件存进仓库
+          git rm --cached EPG/*.xml 2>/dev/null || true
+          git rm --cached EPG/*.gz 2>/dev/null || true
+
+          # 4. 提交并推送
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "没有检测到任何变更，跳过提交。"
           else
             git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') [skip ci]"
-            # 增加推送重试，防止网络波动
-            for i in {1..3}; do git push origin main && break || sleep 5; done
+            # 使用 rebase 模式推送，防止多人协作冲突
+            git pull origin main --rebase
+            git push origin main
           fi
