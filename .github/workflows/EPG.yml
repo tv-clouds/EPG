@@ -37,6 +37,9 @@ jobs:
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_hk.xml.gz" -o EPG/hk.xml.gz || echo "HK 下载失败"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_tw.xml.gz" -o EPG/tw.xml.gz || echo "TW 下载失败"
           
+          # 新增：下载 boss.xml (注意这个源是 .xml 结尾，不是 .gz)
+          curl -Lfs --retry 3 "https://raw.githubusercontent.com/yenkj/epg/refs/heads/main/boss.xml" -o EPG/boss.xml || echo "BOSS 下载失败"          
+          
           echo "正在统一处理解压逻辑..."
           # 遍历所有下载的文件，如果是 .gz 就解压，如果已经是 .xml 则保持原样
           for f in EPG/*; do
