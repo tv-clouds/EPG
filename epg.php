@@ -72,20 +72,39 @@ foreach ($xmlFilesToProcess as $fileName) {
 }
 
 // --- 3. 写入逻辑 ---
-// (这部分和你之前的逻辑一致，无需修改分箱逻辑)
 foreach ($channels as $id => $progList) {
     $displayName = $channelNames[$id] ?? $id;
+    
+    // 排序与去重
     usort($progList, function($a, $b) { return strcmp($a['startTime'], $b['startTime']); });
     $finalProgList = array_values(array_map("unserialize", array_unique(array_map("serialize", $progList))));
     $jsonEncoded = json_encode($finalProgList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
-    $targetDir = $baseDir . $folderIdx . '/';
-    if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+    // --- 关键修改开始：处理 CCTV5+ 到 CCTV5Plus ---
+    $nameItem = trim($displayName);
+    $targets = [$nameItem]; // 默认写入原始名称
 
-    $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', trim($displayName));
-    if (file_put_contents($targetDir . $safeFileName . '.json', $jsonEncoded)) {
-        $globalFileCount++;
+    // 如果名称中包含 '+'，则额外添加一个 'Plus' 的目标
+    if (strpos($nameItem, '+') !== false) {
+        $targets[] = str_replace('+', 'Plus', $nameItem);
+    }
+    // --- 关键修改结束 ---
+
+    // 遍历所有目标文件名进行写入
+    foreach ($targets as $targetName) {
+        // 分箱计算
+        $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
+        $targetDir = $baseDir . $folderIdx . '/';
+        
+        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+
+        // 文件名安全过滤
+        $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
+        $fullPath = $targetDir . $safeFileName . '.json';
+
+        if (file_put_contents($fullPath, $jsonEncoded) !== false) {
+            $globalFileCount++;
+        }
     }
 }
 echo "📊 Done: $globalFileCount files generated.\n";
