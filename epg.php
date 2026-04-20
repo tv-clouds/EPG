@@ -21,7 +21,7 @@ if ($oldFolders) {
 }
 
 // --- 2. 解析逻辑 ---
-$xmlFilesToProcess = ['t.xml', 'pl.xml' , 'boss.xml','hk.xml', 'tw.xml'];
+$xmlFilesToProcess = ['jack.xml', 't.xml','pl.xml' , 'boss.xml','hk.xml', 'tw.xml'];
 $channels = [];
 $channelNames = [];
 $lockedChannelIds = [];
