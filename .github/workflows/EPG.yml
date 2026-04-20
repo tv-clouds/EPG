@@ -35,9 +35,6 @@ jobs:
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_cn.xml.gz" -o EPG/xml_source/cn.xml.gz || echo "CN failed"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_hk.xml.gz" -o EPG/xml_source/hk.xml.gz || echo "HK failed"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_tw.xml.gz" -o EPG/xml_source/tw.xml.gz || echo "TW failed"
-          curl -Lfs --retry 3 "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/xml_source/t.xml.gz || echo "T failed"
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/litiande03/epg/refs/heads/master/pl.xml.gz" -o EPG/xml_source/pl.xml.gz || echo "PL failed"
-          curl -Lfs --retry 3 "https://raw.githubusercontent.com/yenkj/epg/refs/heads/main/boss.xml" -o EPG/xml_source/boss.xml || echo "BOSS failed"
           
           # 解压
           for f in EPG/xml_source/*.gz; do
