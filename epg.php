@@ -89,19 +89,18 @@ foreach ($channels as $id => $progList) {
     $nameItem = trim($displayName);
     $targets = [$nameItem]; 
 
-    // 处理 Plus 衍生名
+    // 如果 XML 里的名字包含 +，则额外生成一份 Plus 版（根据你原代码逻辑保留）
     if (strpos($nameItem, '+') !== false) {
         $targets[] = str_replace('+', 'Plus', $nameItem);
     }
 
     foreach ($targets as $targetName) {
-        // 文件名安全过滤
+        // 【修改点】仅过滤系统非法的路径字符，不要进行繁简转化或大小写转化
         $safeFileName = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '_', $targetName);
-        $fileLower = strtolower($safeFileName);
-
-        // 【核心逻辑】如果这个文件名已经生成过了，就跳过，不合并也不覆盖
-        // 这样“青海卫视高清”和“青海卫视”因为名称不同，会分别触发写入
-        if (isset($generatedFiles[$fileLower])) continue;
+        
+        // 【核心修改】直接使用原始文件名作为索引，不使用 strtolower()
+        // 这样 "CCTV1" 和 "cctv1" 会被视为两个不同的文件分别生成
+        if (isset($generatedFiles[$safeFileName])) continue;
 
         // 分箱计算
         $folderIdx = str_pad(ceil(($globalFileCount + 1) / $filesPerFolder), 2, '0', STR_PAD_LEFT);
@@ -113,7 +112,8 @@ foreach ($channels as $id => $progList) {
 
         if (file_put_contents($fullPath, $jsonEncoded) !== false) {
             $globalFileCount++;
-            $generatedFiles[$fileLower] = true;
+            // 记录原始字符，确保同名不重复写，但异名（含大小写差异）能通过
+            $generatedFiles[$safeFileName] = true;
         }
     }
 }
