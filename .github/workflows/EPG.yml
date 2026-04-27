@@ -39,6 +39,7 @@ jobs:
           
           # 下载到 xml_source 文件夹中
           curl -Lfs --retry 3 "https://github.com/zzq1234567890/epg/raw/refs/heads/main/swepg.xml.gz" -o EPG/xml_source/swepg.xml.gz || echo "swepg failed"
+          curl -Lfs --retry 3 "https://epg.yang-1989.eu.org/epg.xml.gz" -o EPG/xml_source/epg.xml.gz || echo "epg failed"
           curl -Lfs --retry 3 "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/xml_source/t.xml.gz || echo "T failed"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_hk.xml.gz" -o EPG/xml_source/hk.xml.gz || echo "HK failed"
           curl -Lfs --retry 3 "https://raw.githubusercontent.com/taksssss/tv/main/epg/epgpw_tw.xml.gz" -o EPG/xml_source/tw.xml.gz || echo "TW failed"
@@ -63,19 +64,20 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 1. 先把所有变更添加到暂存区（包括删除的文件）
+          # 1. 暂存所有更改
           git add EPG/
           
-          # 2. 检查是否有文件变动
+          # 2. 检查是否有变动
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            # 3. 先提交本地变更
+            # 3. 提交本地更改
             git commit -m "Update EPG: $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 4. 采用拉取并自动处理冲突的策略
-            # 使用 -X theirs 可以在冲突时优先保留本次生成的最新 EPG 数据
-            git pull --rebase -X theirs origin main
+            # 4. 暴力同步：拉取远程分支，如果冲突则强制以本地(我们的新数据)为准
+            # 这种方式比 rebase 在自动化环境中更可靠
+            git fetch origin main
+            git merge -X ours origin/main --allow-unrelated-histories || echo "Merge conflict handled"
             
             # 5. 推送
             git push origin main
