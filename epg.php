@@ -21,7 +21,7 @@ if ($oldFolders) {
 }
 
 // --- 2. 解析逻辑 ---
-$xmlFilesToProcess = ['swepg.xml', 'epg.xml', 'xmltv.xml', 't.xml', 'hk.xml', 'tw.xml'];
+$xmlFilesToProcess = ['cn.xml', 'swepg.xml', 'epg.xml', 'xmltv.xml', 't.xml', 'hk.xml', 'tw.xml'];
 $channels = [];
 $channelNames = [];
 $generatedFiles = []; // 新增：用于记录已生成的文件名，防止重复写入
