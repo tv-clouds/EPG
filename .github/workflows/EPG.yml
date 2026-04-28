@@ -38,6 +38,7 @@ jobs:
           mkdir -p EPG/xml_source
           
           # 下载到 xml_source 文件夹中
+          curl -Lfs --retry 3 "https://liliu.serv00.net/epg/cn.xml.gz" -o EPG/xml_source/cn.xml.gz || echo "CN failed"
           curl -Lfs --retry 3 "https://github.com/zzq1234567890/epg/raw/refs/heads/main/swepg.xml.gz" -o EPG/xml_source/swepg.xml.gz || echo "swepg failed"
           curl -Lfs --retry 3 "https://epg.yang-1989.eu.org/epg.xml.gz" -o EPG/xml_source/epg.xml.gz || echo "epg failed"
           curl -Lfs --retry 3 "https://tv.mxdyeah.top/epgphp/t.xml.gz" -o EPG/xml_source/t.xml.gz || echo "T failed"
